@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
+import { Session } from "@supabase/supabase-js";
 import { CalendarNavigation } from "./components/CalendarNavigation";
 import { TimeSlotGrid } from "./components/TimeSlotGrid";
 import { BookingModal } from "./components/BookingModal";
 import { HostDashboard } from "./components/HostDashboard";
+import { ConfirmLogoutModal } from "./ConfirmLogoutModal";
+import { Login } from "./Login";
 import { TimeSlot, BookingRequest, AvailableSlot } from "./types/booking";
-import { bookingService } from "./services/supabase";
+import { bookingService, supabase } from "./services/supabase";
 // import { calendarService } from "./services/googleCalendar";
 import { Calendar, Users, Settings, LogOut } from "lucide-react";
 
@@ -19,6 +22,9 @@ function App() {
   const [currentView, setCurrentView] = useState<"guest" | "host">("guest");
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Mock data for demonstration
   useEffect(() => {
@@ -27,7 +33,6 @@ function App() {
       try {
         const initialSlots = await bookingService.getTimeSlots();
         setSlots(initialSlots);
-        console.log(initialSlots);
       } catch (error) {
         console.error("Error fetching initial slots:", error);
       } finally {
@@ -37,14 +42,24 @@ function App() {
 
     fetchInitialSlots();
 
-    const subscription = bookingService.subscribeToSlotChanges(
+    const {
+      data: { subscription: authSubscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session) {
+        setCurrentView("guest");
+      }
+    });
+
+    const slotsSubscription = bookingService.subscribeToSlotChanges(
       (updatedSlots) => {
         setSlots(updatedSlots);
       }
     );
 
     return () => {
-      subscription.unsubscribe();
+      authSubscription.unsubscribe();
+      slotsSubscription.unsubscribe();
     };
   }, [refresh]);
 
@@ -103,6 +118,25 @@ function App() {
     setSlots((prevSlots) => prevSlots.filter((slot) => slot.id !== slotId));
   };
 
+  const handleLogoutClick = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      // onAuthStateChange listener will handle the rest
+    } catch (error) {
+      console.error("Error logging out:", error);
+      alert("Đăng xuất thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsLoggingOut(false);
+      setIsLogoutModalOpen(false);
+    }
+  };
+
   // if (loading) {
   //   return (
   //     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -148,6 +182,14 @@ function App() {
                   <Settings className="w-4 h-4" />
                   Quản lý
                 </button>
+                {session && (
+                  <button
+                    onClick={handleLogoutClick}
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+                    <LogOut className="w-4 h-4" />
+                    Đăng xuất
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -194,13 +236,15 @@ function App() {
               )}
             </div>
           </div>
-        ) : (
+        ) : session ? (
           <HostDashboard
             slots={slots}
             loading={loading}
             onCreateSlots={handleCreateSlots}
             onDeleteSlot={handleDeleteSlot}
           />
+        ) : (
+          <Login onLoginSuccess={() => {}} />
         )}
       </main>
 
@@ -213,6 +257,13 @@ function App() {
         }}
         onConfirm={handleBookingConfirm}
         isLoading={isBooking}
+      />
+
+      <ConfirmLogoutModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={handleConfirmLogout}
+        isLoading={isLoggingOut}
       />
     </div>
   );
