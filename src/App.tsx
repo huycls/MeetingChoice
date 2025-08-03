@@ -4,6 +4,7 @@ import { CalendarNavigation } from "./components/CalendarNavigation";
 import { TimeSlotGrid } from "./components/TimeSlotGrid";
 import { BookingModal } from "./components/BookingModal";
 import { HostDashboard } from "./components/HostDashboard";
+import { NotificationToast } from "./NotificationToast";
 import { ConfirmLogoutModal } from "./ConfirmLogoutModal";
 import { Login } from "./Login";
 import { TimeSlot, BookingRequest, AvailableSlot } from "./types/booking";
@@ -20,6 +21,10 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
   const [currentView, setCurrentView] = useState<"guest" | "host">("guest");
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
@@ -94,9 +99,13 @@ function App() {
 
       setIsModalOpen(false);
       setSelectedSlot(null);
+      setToast({ message: "Đặt lịch thành công!", type: "success" });
     } catch (error) {
       console.error("Booking failed:", error);
-      alert("Đặt lịch thất bại. Vui lòng thử lại.");
+      setToast({
+        message: "Đặt lịch thất bại. Vui lòng thử lại.",
+        type: "error",
+      });
     } finally {
       setIsBooking(false);
     }
@@ -106,9 +115,13 @@ function App() {
     try {
       await bookingService.createTimeSlots(newSlots);
       setRefresh(Math.random());
+      setToast({ message: "Tạo slot thành công!", type: "success" });
     } catch (error) {
       console.error("Failed to create slots:", error);
-      alert("Tạo slot thất bại. Vui lòng thử lại.");
+      setToast({
+        message: "Tạo slot thất bại. Vui lòng thử lại.",
+        type: "error",
+      });
     }
   };
 
@@ -150,6 +163,13 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {toast && (
+        <NotificationToast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">

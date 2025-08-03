@@ -38,6 +38,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
     endTime: "",
   });
   const [selectedAvailableDate, setSelectedAvailableDate] = useState("all");
+  const [timeForEachMeeting, setTimeForEachMeeting] = useState(30);
 
   const formatTime = (time: string) => {
     return new Date(`2000-01-01T${time}`).toLocaleTimeString("vi-VN", {
@@ -103,10 +104,10 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
     }
 
     for (let hour = workStart; hour < workEnd; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
+      for (let minute = 0; minute < 60; minute += timeForEachMeeting) {
         const startHour = hour;
         const startMinute = minute;
-        const endMinute = minute + 30;
+        const endMinute = minute + timeForEachMeeting;
         const endHour = endMinute >= 60 ? hour + 1 : hour;
         const adjustedEndMinute = endMinute >= 60 ? 0 : endMinute;
 
@@ -185,14 +186,6 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
             <Plus className="w-4 h-4" />
             Tạo slot mới
           </button>
-
-          <button
-            onClick={generateTimeSlots}
-            disabled={!newSlotData.date}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            <Clock className="w-4 h-4" />
-            Tạo slots cả ngày
-          </button>
         </div>
 
         {isCreating && (
@@ -250,6 +243,24 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
                 />
               </div>
             </div>
+            <div className="my-4 flex flex-col">
+              <p className="mb-2">Thời gian cho mỗi cuộc họp:</p>
+              <select
+                value={timeForEachMeeting}
+                onChange={(e) =>
+                  setTimeForEachMeeting(parseInt(e.target.value))
+                }
+                className="px-3 py-2 border border-gray-3 w-fit rounded-lg focus:ring-2">
+                <option value="15">15 phút</option>
+                <option value="30">30 phút</option>
+                <option value="45">45 phút</option>
+                <option value="60">1 giờ</option>
+              </select>
+              <small className="text-slate-500 mt-2">
+                <span className="">Lưu ý:</span> thời gian ở đây chỉ dành cho
+                Tạo slot hàng loạt
+              </small>
+            </div>
             <div className="flex gap-2 mt-4">
               <button
                 onClick={handleCreateSlot}
@@ -260,6 +271,13 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
                 }
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 Tạo slot
+              </button>
+              <button
+                onClick={generateTimeSlots}
+                disabled={!newSlotData.date}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <Clock className="w-4 h-4" />
+                Tạo slots hàng loạt
               </button>
               <button
                 onClick={() => setIsCreating(false)}
