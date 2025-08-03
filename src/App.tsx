@@ -5,11 +5,15 @@ import { TimeSlotGrid } from "./components/TimeSlotGrid";
 import { BookingModal } from "./components/BookingModal";
 import { HostDashboard } from "./components/HostDashboard";
 import { NotificationToast } from "./NotificationToast";
+import { ConfirmCancelModal } from "./ConfirmCancelModal";
 import { ConfirmLogoutModal } from "./ConfirmLogoutModal";
 import { Login } from "./Login";
 import { TimeSlot, BookingRequest, AvailableSlot } from "./types/booking";
 import { bookingService, supabase } from "./services/supabase";
-// import { calendarService } from "./services/googleCalendar";
+import {
+  calendarService as mockCalendarService,
+  realCalendarService as GoogleCalendarService,
+} from "./services/googleCalendar";
 import { Calendar, Users, Settings, LogOut } from "lucide-react";
 
 function App() {
@@ -30,6 +34,8 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [slotToCancel, setSlotToCancel] = useState<TimeSlot | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Mock data for demonstration
   useEffect(() => {
@@ -41,7 +47,9 @@ function App() {
       } catch (error) {
         console.error("Error fetching initial slots:", error);
       } finally {
-        setLoading(false);
+        setTimeout(() => {
+          setLoading(false);
+        }, 1000);
       }
     };
 
@@ -86,20 +94,49 @@ function App() {
     try {
       await bookingService.bookTimeSlot(selectedSlot.id, bookingData);
 
-      // Send calendar invite
-      // await calendarService.sendMeetingInvite(
-      //   bookingData.guestEmail,
-      //   bookingData.guestName,
-      //   "host@company.com",
-      //   selectedSlot.date,
-      //   selectedSlot.startTime,
-      //   selectedSlot.endTime,
-      //   bookingData.guestNote
-      // );
+      // Kiểm tra nếu Host đã kết nối Google Calendar và có provider_token
+      if (session && session.provider_token) {
+        console.log("Using REAL Google Calendar service to send invite.");
+        //Lấy API Key từ biến môi trường (cần được cấu hình)
+        const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+        if (!apiKey) {
+          console.error("VITE_GOOGLE_API_KEY is not set in .env file.");
+          // Fallback to mock or show an error
+        } else {
+          const realCalendarService = new GoogleCalendarService(
+            apiKey,
+            session.provider_token
+          );
+          await realCalendarService.sendMeetingInvite(
+            bookingData.guestEmail,
+            bookingData.guestName,
+            session.user.email!, // Email của host đã đăng nhập
+            selectedSlot.date,
+            selectedSlot.startTime,
+            selectedSlot.endTime,
+            bookingData.guestNote
+          );
+        }
+      } else {
+        console.log(
+          "Using MOCK calendar service. Host not connected to Google Calendar."
+        );
+        // Sử dụng dịch vụ giả nếu không có kết nối
+        await mockCalendarService.sendMeetingInvite(
+          bookingData.guestEmail,
+          bookingData.guestName,
+          "host@example.com", // Email giả
+          selectedSlot.date,
+          selectedSlot.startTime,
+          selectedSlot.endTime,
+          bookingData.guestNote
+        );
+      }
 
       setIsModalOpen(false);
       setSelectedSlot(null);
       setToast({ message: "Đặt lịch thành công!", type: "success" });
+      setRefresh(Math.random());
     } catch (error) {
       console.error("Booking failed:", error);
       setToast({
@@ -129,6 +166,47 @@ function App() {
     await bookingService.deleteTimeSlot(slotId);
 
     setSlots((prevSlots) => prevSlots.filter((slot) => slot.id !== slotId));
+  };
+
+  const handleCancelBookingClick = (slot: TimeSlot) => {
+    setSlotToCancel(slot);
+  };
+
+  const handleConfirmCancelBooking = async () => {
+    if (!slotToCancel) return;
+
+    setIsCancelling(true);
+    try {
+      await bookingService.cancelBooking(slotToCancel.id);
+      setToast({ message: "Hủy lịch hẹn thành công!", type: "success" });
+      setRefresh(Math.random());
+    } catch (error) {
+      console.error("Failed to cancel booking:", error);
+      setToast({
+        message: "Hủy lịch hẹn thất bại. Vui lòng thử lại.",
+        type: "error",
+      });
+    } finally {
+      setIsCancelling(false);
+      setSlotToCancel(null);
+    }
+  };
+
+  const handleConnectGoogleCalendar = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        scopes: "https://www.googleapis.com/auth/calendar.events",
+        redirectTo: window.location.origin,
+      },
+    });
+    if (error) {
+      console.error("Error connecting to Google Calendar:", error);
+      setToast({
+        message: "Kết nối Google Calendar thất bại.",
+        type: "error",
+      });
+    }
   };
 
   const handleLogoutClick = () => {
@@ -262,6 +340,9 @@ function App() {
             loading={loading}
             onCreateSlots={handleCreateSlots}
             onDeleteSlot={handleDeleteSlot}
+            onCancelBooking={handleCancelBookingClick}
+            session={session}
+            onConnectGoogleCalendar={handleConnectGoogleCalendar}
           />
         ) : (
           <Login onLoginSuccess={() => {}} />
@@ -284,6 +365,14 @@ function App() {
         onClose={() => setIsLogoutModalOpen(false)}
         onConfirm={handleConfirmLogout}
         isLoading={isLoggingOut}
+      />
+
+      <ConfirmCancelModal
+        isOpen={!!slotToCancel}
+        onClose={() => setSlotToCancel(null)}
+        onConfirm={handleConfirmCancelBooking}
+        isLoading={isCancelling}
+        slot={slotToCancel}
       />
     </div>
   );

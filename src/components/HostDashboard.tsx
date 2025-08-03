@@ -1,12 +1,25 @@
 import React, { useState, useMemo } from "react";
 import { TimeSlot, AvailableSlot } from "../types/booking";
-import { Plus, Clock, Trash2, Calendar, Users } from "lucide-react";
+import {
+  Plus,
+  Clock,
+  Trash2,
+  Calendar,
+  Users,
+  CheckCircle,
+  Link,
+  Download,
+} from "lucide-react";
+import { Session } from "@supabase/supabase-js";
 
 interface HostDashboardProps {
   slots: TimeSlot[];
   loading: boolean;
   onCreateSlots: (slots: AvailableSlot[]) => void;
   onDeleteSlot: (slotId: string) => void;
+  onCancelBooking: (slot: TimeSlot) => void;
+  session: Session | null;
+  onConnectGoogleCalendar: () => void;
 }
 
 function getHourNumber(timeString: string): number {
@@ -30,6 +43,9 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
   loading,
   onCreateSlots,
   onDeleteSlot,
+  onCancelBooking,
+  session,
+  onConnectGoogleCalendar,
 }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newSlotData, setNewSlotData] = useState({
@@ -39,6 +55,10 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
   });
   const [selectedAvailableDate, setSelectedAvailableDate] = useState("all");
   const [timeForEachMeeting, setTimeForEachMeeting] = useState(30);
+
+  const isGoogleCalendarConnected =
+    session?.provider_token &&
+    session?.user?.app_metadata?.provider === "google";
 
   const formatTime = (time: string) => {
     return new Date(`2000-01-01T${time}`).toLocaleTimeString("vi-VN", {
@@ -129,6 +149,89 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
     setNewSlotData({ date: "", startTime: "", endTime: "" });
   };
 
+  const handleExportToCsv = () => {
+    if (bookedSlots.length === 0) {
+      alert("Không có lịch hẹn nào đã được đặt để xuất file.");
+      return;
+    }
+
+    const headers = [
+      "Subject",
+      "Start Date",
+      "Start Time",
+      "End Date",
+      "End Time",
+      "All Day Event",
+      "Description",
+      "Location",
+      "Private",
+    ];
+
+    const formatCsvDate = (dateStr: string) => {
+      const date = new Date(dateStr);
+      const month = (date.getMonth() + 1).toString();
+      const day = date.getDate().toString();
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    };
+
+    const formatCsvTime = (timeStr: string) => {
+      return new Date(`2000-01-01T${timeStr}`).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+    };
+
+    const escapeCsvField = (field: string | null | undefined) => {
+      const stringField = String(field || "");
+      if (/[",\n]/.test(stringField)) {
+        return `"${stringField.replace(/"/g, '""')}"`;
+      }
+      return stringField;
+    };
+
+    const rows = bookedSlots.map((slot) => {
+      const subject = `Cuộc họp với ${slot.guestName || "khách"}`;
+      const startDate = formatCsvDate(slot.date);
+      const startTime = formatCsvTime(slot.startTime);
+      const endDate = formatCsvDate(slot.date);
+      const endTime = formatCsvTime(slot.endTime);
+      const allDayEvent = "False";
+      const description = slot.guestNote || "";
+      const location = ""; // Dữ liệu vị trí không có sẵn
+      const isPrivate = "False";
+
+      return [
+        subject,
+        startDate,
+        startTime,
+        endDate,
+        endTime,
+        allDayEvent,
+        description,
+        location,
+        isPrivate,
+      ]
+        .map(escapeCsvField)
+        .join(",");
+    });
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "google_calendar_import.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const bookedSlots = slots.filter((slot) => slot.isBooked);
   // const availableSlots = slots.filter(
   //   (slot) => slot.isAvailable && !slot.isBooked
@@ -140,6 +243,38 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
         <h2 className="text-xl font-bold text-gray-900 mb-4">
           Quản lý lịch họp
         </h2>
+
+        <div className="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
+          <h3 className="font-semibold text-gray-800 mb-2">
+            Tích hợp Google Calendar
+          </h3>
+          {isGoogleCalendarConnected ? (
+            <div className="flex items-center gap-3 p-3 bg-green-100 border border-green-200 rounded-lg">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+              <div>
+                <p className="font-medium text-green-800">
+                  Đã kết nối với Google Calendar
+                </p>
+                <p className="text-sm text-green-700">
+                  Lời mời sẽ được tự động gửi khi có lịch đặt mới.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                Kết nối với Google Calendar để tự động tạo sự kiện và gửi lời
+                mời cho khách hàng.
+              </p>
+              <button
+                onClick={onConnectGoogleCalendar}
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                <Link className="w-4 h-4" />
+                Kết nối ngay
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-blue-50 p-4 rounded-lg">
@@ -291,9 +426,18 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
 
       {bookedSlots.length > 0 && (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Lịch đã được đặt
-          </h3>
+          <div className="flex lg:flex-row flex-col justify-between gap-4 items-center mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Lịch đã được đặt
+            </h3>{" "}
+            <button
+              onClick={handleExportToCsv}
+              disabled={bookedSlots.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              <Download className="w-4 h-4" />
+              Xuất lịch đã đặt (.csv)
+            </button>
+          </div>
           {loading ? (
             <>
               <div className="flex items-center justify-center gap-2 text-[#1e40af]">
@@ -318,8 +462,8 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
               {bookedSlots.map((slot) => (
                 <div
                   key={slot.id}
-                  className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <div>
+                  className="flex flex-col relative sm:flex-row items-start sm:items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200 gap-3">
+                  <div className="flex-grow">
                     <div className="flex items-center gap-4">
                       <span className="font-medium text-orange-900">
                         {formatDate(slot.date)} • {formatTime(slot.startTime)} -{" "}
@@ -338,6 +482,12 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
                       </p>
                     )}
                   </div>
+                  <button
+                    onClick={() => onCancelBooking(slot)}
+                    className="flex-shrink-0 absolute right-4 top-4 flex items-center gap-2 px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium self-end sm:self-center">
+                    <Trash2 className="w-4 h-4" />
+                    Hủy lịch
+                  </button>
                 </div>
               ))}
             </div>

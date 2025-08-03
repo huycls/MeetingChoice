@@ -105,4 +105,13 @@ export class MockGoogleCalendarService {
   }
 }
 
+// --- Hướng dẫn tích hợp Google Calendar thật ---
+// 1. Comment dòng `MockGoogleCalendarService` dưới đây.
+// 2. Bỏ comment dòng `GoogleCalendarService` và thay thế bằng key và token của bạn.
+//    Lưu ý: `accessToken` thường được lấy động thông qua quy trình OAuth 2.0 khi người dùng đăng nhập và cấp quyền.
+
+// Dịch vụ giả để demo
 export const calendarService = new MockGoogleCalendarService();
+
+// Dịch vụ thật (chưa được kích hoạt)
+export const realCalendarService = GoogleCalendarService;

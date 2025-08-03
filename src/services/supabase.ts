@@ -117,6 +117,25 @@ export class BookingService {
     }
   }
 
+  async cancelBooking(slotId: string): Promise<void> {
+    const { error } = await supabase
+      .from("time_slots")
+      .update({
+        is_booked: false,
+        guest_name: null,
+        guest_email: null,
+        guest_note: null,
+        booked_at: null,
+        booked_by: null,
+      })
+      .eq("id", slotId);
+
+    if (error) {
+      console.error("Error cancelling booking:", error);
+      throw error;
+    }
+  }
+
   subscribeToSlotChanges(callback: (slots: TimeSlot[]) => void) {
     return supabase
       .channel('time_slots_changes')
