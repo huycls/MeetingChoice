@@ -39,10 +39,15 @@ function App() {
 
   // Mock data for demonstration
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hostId = urlParams.get("host");
+
     const fetchInitialSlots = async () => {
       setLoading(true);
       try {
-        const initialSlots = await bookingService.getTimeSlots();
+        const initialSlots = await bookingService.getTimeSlots(
+          hostId ?? undefined
+        );
         setSlots(initialSlots);
       } catch (error) {
         console.error("Error fetching initial slots:", error);
@@ -67,7 +72,8 @@ function App() {
     const slotsSubscription = bookingService.subscribeToSlotChanges(
       (updatedSlots) => {
         setSlots(updatedSlots);
-      }
+      },
+      hostId ?? undefined
     );
 
     return () => {
@@ -217,6 +223,7 @@ function App() {
     setIsLoggingOut(true);
     try {
       const { error } = await supabase.auth.signOut();
+      setRefresh(Math.random());
       if (error) throw error;
       // onAuthStateChange listener will handle the rest
     } catch (error) {
@@ -343,9 +350,14 @@ function App() {
             onCancelBooking={handleCancelBookingClick}
             session={session}
             onConnectGoogleCalendar={handleConnectGoogleCalendar}
+            setToast={setToast}
           />
         ) : (
-          <Login onLoginSuccess={() => {}} />
+          <Login
+            onLoginSuccess={() => {
+              setRefresh(Math.random());
+            }}
+          />
         )}
       </main>
 

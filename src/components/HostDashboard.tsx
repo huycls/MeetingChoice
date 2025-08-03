@@ -8,6 +8,7 @@ import {
   Users,
   CheckCircle,
   Link,
+  Copy,
   Download,
 } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
@@ -20,6 +21,9 @@ interface HostDashboardProps {
   onCancelBooking: (slot: TimeSlot) => void;
   session: Session | null;
   onConnectGoogleCalendar: () => void;
+  setToast: (
+    toast: { message: string; type: "success" | "error" } | null
+  ) => void;
 }
 
 function getHourNumber(timeString: string): number {
@@ -46,6 +50,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
   onCancelBooking,
   session,
   onConnectGoogleCalendar,
+  setToast,
 }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newSlotData, setNewSlotData] = useState({
@@ -55,6 +60,13 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
   });
   const [selectedAvailableDate, setSelectedAvailableDate] = useState("all");
   const [timeForEachMeeting, setTimeForEachMeeting] = useState(30);
+
+  const publicLink = `${window.location.origin}/?host=${session?.user?.id}`;
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(publicLink);
+    setToast({ message: "Đã sao chép liên kết!", type: "success" });
+  };
 
   const isGoogleCalendarConnected =
     session?.provider_token &&
@@ -239,6 +251,30 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
 
   return (
     <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          Chia sẻ trang đặt lịch của bạn
+        </h2>
+        <p className="text-sm text-gray-600 mb-3">
+          Đây là liên kết công khai đến trang đặt lịch của bạn. Bất kỳ ai có
+          liên kết này đều có thể xem các khung giờ trống và đặt lịch hẹn.
+        </p>
+        <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg border border-gray-200">
+          <Link className="w-5 h-5 text-gray-500 ml-2 flex-shrink-0" />
+          <input
+            type="text"
+            readOnly
+            value={publicLink}
+            className="w-full bg-transparent border-none focus:ring-0 text-gray-700"
+          />
+          <button
+            onClick={handleCopyLink}
+            className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium">
+            <Copy className="w-4 h-4" />
+            Sao chép
+          </button>
+        </div>
+      </div>
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
           Quản lý lịch họp

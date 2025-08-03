@@ -8,10 +8,26 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export class BookingService {
-  async getTimeSlots(): Promise<TimeSlot[]> {
+  async getTimeSlots(hostId?: string): Promise<TimeSlot[]> {
+    let userIdToFetch: string | undefined = hostId;
+
+    // If no hostId is provided (e.g., for the host dashboard), get the logged-in user's ID.
+    if (!userIdToFetch) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        userIdToFetch = user.id;
+      }
+    }
+
+    if (!userIdToFetch) {
+      console.log('No host ID provided and no user logged in, returning no slots.');
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('time_slots')
       .select('*')
+      .eq('user_id', userIdToFetch) // Filter by either the provided hostId or the logged-in user's ID
       .order('date', { ascending: true })
       .order('start_time', { ascending: true });
 
@@ -31,17 +47,26 @@ export class BookingService {
       bookedAt: slot.booked_at,
       guestName: slot.guest_name,
       guestEmail: slot.guest_email,
-      guestNote: slot.guest_note
+      guestNote: slot.guest_note,
+      userId: slot.user_id,
     }));
   }
 
   async createTimeSlots(slots: AvailableSlot[]): Promise<TimeSlot[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      console.error('User not authenticated to create time slots');
+      throw new Error('User not authenticated');
+    }
+
     const slotsData = slots.map(slot => ({
       date: slot.date,
       start_time: slot.startTime,
       end_time: slot.endTime,
       is_available: true,
-      is_booked: false
+      is_booked: false,
+      user_id: user.id, // Gán user_id của host tạo slot
     }));
 
     const { data, error } = await supabase
@@ -65,7 +90,8 @@ export class BookingService {
       bookedAt: slot.booked_at,
       guestName: slot.guest_name,
       guestEmail: slot.guest_email,
-      guestNote: slot.guest_note
+      guestNote: slot.guest_note,
+      userId: slot.user_id,
     }));
   }
 
@@ -101,7 +127,8 @@ export class BookingService {
       bookedAt: data.booked_at,
       guestName: data.guest_name,
       guestEmail: data.guest_email,
-      guestNote: data.guest_note
+      guestNote: data.guest_note,
+      userId: data.user_id,
     };
   }
 
@@ -136,7 +163,7 @@ export class BookingService {
     }
   }
 
-  subscribeToSlotChanges(callback: (slots: TimeSlot[]) => void) {
+  subscribeToSlotChanges(callback: (slots: TimeSlot[]) => void, hostId?: string) {
     return supabase
       .channel('time_slots_changes')
       .on('postgres_changes', {
@@ -144,7 +171,7 @@ export class BookingService {
         schema: 'public',
         table: 'time_slots'
       }, () => {
-        this.getTimeSlots().then(callback);
+        this.getTimeSlots(hostId).then(callback);
       })
       .subscribe();
   }
