@@ -280,7 +280,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
           Quản lý lịch họp
         </h2>
 
-        <div className="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
+        {/* <div className="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
           <h3 className="font-semibold text-gray-800 mb-2">
             Tích hợp Google Calendar
           </h3>
@@ -310,7 +310,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
               </button>
             </div>
           )}
-        </div>
+        </div> */}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-blue-50 p-4 rounded-lg">

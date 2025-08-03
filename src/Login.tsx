@@ -125,7 +125,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             </button>
           </div>
 
-          {/* <div className="relative my-4">
+          <div className="relative my-4">
             <div
               className="absolute inset-0 flex items-center"
               aria-hidden="true">
@@ -168,7 +168,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               </svg>
               Google
             </button>
-          </div> */}
+          </div>
         </form>
       </div>
     </div>
